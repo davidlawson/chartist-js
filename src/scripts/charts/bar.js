@@ -87,6 +87,8 @@
     distributeSeries: false,
     // If true the whole data is reversed including labels, the series order as well as the whole series data arrays.
     reverseData: false,
+    // If true, background lines are drawn for each bar
+    barBackgrounds: false,
     // Override the class names that get used to generate the SVG structure of the chart
     classNames: {
       chart: 'ct-chart-bar',
@@ -95,6 +97,8 @@
       labelGroup: 'ct-labels',
       series: 'ct-series',
       bar: 'ct-bar',
+      barBackground: 'ct-bar-background',
+      barGroup: 'ct-bar-group',
       grid: 'ct-grid',
       gridGroup: 'ct-grids',
       vertical: 'ct-vertical',
@@ -315,11 +319,6 @@
         previousStack = stackedBarValues[valueIndex] || zeroPoint;
         stackedBarValues[valueIndex] = previousStack - (zeroPoint - projected[labelAxis.counterUnits.pos]);
 
-        // Skip if value is undefined
-        if(value === undefined) {
-          return;
-        }
-
         var positions = {};
         positions[labelAxis.units.pos + '1'] = projected[labelAxis.units.pos];
         positions[labelAxis.units.pos + '2'] = projected[labelAxis.units.pos];
@@ -344,13 +343,49 @@
         positions.y1 = Math.min(Math.max(positions.y1, chartRect.y2), chartRect.y1);
         positions.y2 = Math.min(Math.max(positions.y2, chartRect.y2), chartRect.y1);
 
-        // Create bar element
-        bar = seriesElement.elem('line', positions, options.classNames.bar).attr({
-          'value': [value.x, value.y].filter(function(v) {
-            return v;
-          }).join(','),
+        var barGroup = seriesElement.elem('g', null, options.classNames.barGroup);
+
+        var barBackground = null;
+        if (options.barBackgrounds)
+        {
+          var barBackgroundPositions = { x1: positions.x1, x2: positions.x2, y1: chartRect.y1, y2: chartRect.y2 };
+          barBackground = barGroup.elem('line', barBackgroundPositions, options.classNames.barBackground);
+
+          this.eventEmitter.emit('draw', Chartist.extend({
+            type: 'bar-background',
+            value: value,
+            index: valueIndex,
+            meta: Chartist.getMetaData(series, valueIndex),
+            series: series,
+            seriesIndex: seriesIndex,
+            axisX: axisX,
+            axisY: axisY,
+            chartRect: chartRect,
+            group: seriesElement,
+            element: barBackground
+          }, barBackgroundPositions));
+        }
+
+        barGroup.attr({
           'meta': Chartist.getMetaData(series, valueIndex)
         }, Chartist.xmlNs.uri);
+
+        if (value)
+        {
+          barGroup.attr({
+            'value': [value.x, value.y].filter(function(v) {
+              return v;
+            }).join(','),
+          }, Chartist.xmlNs.uri);
+        }
+
+        // Skip if value is undefined
+        if(value === undefined) {
+          return;
+        }
+
+        // Create bar element
+        bar = barGroup.elem('line', positions, options.classNames.bar);
 
         this.eventEmitter.emit('draw', Chartist.extend({
           type: 'bar',
